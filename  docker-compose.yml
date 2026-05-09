@@ -1,0 +1,145 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # MySQL 数据库
+  # ============================================
+  mysql:
+    image: mysql:8.0
+    container_name: rag-kw-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-mysql123ABC}
+      MYSQL_DATABASE: rag_kw
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_PASSWORD:-mysql123ABC}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - rag-kw-network
+
+  # ============================================
+  # Elasticsearch 向量数据库
+  # ============================================
+  elasticsearch:
+    image: elasticsearch:8.13.4
+    container_name: rag-kw-es
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - TZ=Asia/Shanghai
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - rag-kw-network
+
+  # ============================================
+  # Redis 缓存
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: rag-kw-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rag-kw-network
+
+  # ============================================
+  # RAG-KW 应用服务
+  # ============================================
+  rag-kw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag-kw-app
+    restart: unless-stopped
+    environment:
+      # LLM 配置
+      - LLM_API_KEY=${LLM_API_KEY:?Please set LLM_API_KEY in .env file}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://open.bigmodel.cn/api/paas/v4}
+      - LLM_EMBEDDING_MODEL=${LLM_EMBEDDING_MODEL:-embedding-3}
+      - LLM_EMBEDDING_DIMENSIONS=${LLM_EMBEDDING_DIMENSIONS:-512}
+      - LLM_CHAT_MODEL=${LLM_CHAT_MODEL:-glm-4.7-flash}
+
+      # 数据库配置
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/rag_kw?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD:-mysql123ABC}
+
+      # Elasticsearch 配置
+      - SPRING_ELASTICSEARCH_URIS=http://elasticsearch:9200
+
+      # Redis 配置
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+
+      # JVM 配置
+      - JAVA_OPTS=-Xms512m -Xmx1024m
+
+      # 时区
+      - TZ=Asia/Shanghai
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - app_logs:/app/logs
+    networks:
+      - rag-kw-network
+
+# ============================================
+# 数据卷
+# ============================================
+volumes:
+  mysql_data:
+    driver: local
+  es_data:
+    driver: local
+  redis_data:
+    driver: local
+  app_logs:
+    driver: local
+
+# ============================================
+# 网络
+# ============================================
+networks:
+  rag-kw-network:
+    driver: bridge

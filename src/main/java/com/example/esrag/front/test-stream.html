@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>RAG 流式测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+        #question { width: 100%; padding: 10px; font-size: 16px; margin-bottom: 10px; }
+        #askBtn { padding: 10px 20px; font-size: 16px; background: #007bff; color: white; border: none; cursor: pointer; }
+        #answer { margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 5px; min-height: 100px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>RAG 流式问答测试</h1>
+    <input type="text" id="question" placeholder="输入问题..." value="年假规定是什么？">
+    <button id="askBtn">发送</button>
+    <div id="answer"></div>
+
+    <script>
+        document.getElementById('askBtn').addEventListener('click', () => {
+            const question = document.getElementById('question').value;
+            const answerDiv = document.getElementById('answer');
+            answerDiv.innerHTML = ''; // 清空之前的回答
+
+            const eventSource = new EventSource(`http://localhost:8080/api/rag/ask-stream?question=${encodeURIComponent(question)}`);
+
+            eventSource.addEventListener('message', (event) => {
+                // 逐字追加显示
+                answerDiv.innerHTML += event.data;
+            });
+
+            eventSource.addEventListener('error', (error) => {
+                console.error('SSE Error:', error);
+                answerDiv.innerHTML += '\n[连接错误]';
+                eventSource.close();
+            });
+
+            eventSource.addEventListener('end', () => {
+                eventSource.close();
+            });
+        });
+    </script>
+</body>
+</html>

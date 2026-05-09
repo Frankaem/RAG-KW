@@ -1,0 +1,46 @@
+spring:
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URI:http://localhost:9200}
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/rag_kw?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: ${MYSQL_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 500MB
+      enabled: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath*:/mapper/**/*.xml
+
+llm:
+  api-key: ${LLM_API_KEY}
+  base-url: ${LLM_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
+  embedding-model: ${LLM_EMBEDDING_MODEL:embedding-3}
+  embedding-dimensions: ${LLM_EMBEDDING_DIMENSIONS:512}
+  chat-model: ${LLM_CHAT_MODEL:glm-4.7-flash}
+
+# 长期记忆配置
+memory:
+  long-term:
+    enabled: ${LONG_TERM_MEMORY_ENABLED:true}
+    top-k: ${LONG_TERM_MEMORY_TOP_K:3}
+    relevance-threshold: ${LONG_TERM_MEMORY_RELEVANCE_THRESHOLD:0.7}
