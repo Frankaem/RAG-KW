@@ -2,10 +2,9 @@
 
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.0-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
+[![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://openjdk.java.net/)
 > 🚀 企业级 RAG（检索增强生成）解决方案 | 支持多格式文档解析 | 流式对话 | 三层记忆系统 | 事务一致性保障
 
-[![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://openjdk.java.net/)
 ---
 
 ## 🌟 项目简介
