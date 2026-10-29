@@ -2,6 +2,7 @@ package com.example.esrag.service;
 
 import com.example.esrag.dto.elasticsearch.DocumentChunk;
 import com.example.esrag.enums.RetrievalMode;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
