@@ -3,9 +3,6 @@ package com.example.esrag.service;
 import ai.z.openapi.ZhipuAiClient;
 import ai.z.openapi.service.model.*;
 
-import co.elastic.clients.elasticsearch.ElasticsearchClient;
-import co.elastic.clients.elasticsearch.core.SearchResponse;
-import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.alibaba.fastjson2.JSON;
 import com.example.esrag.ChunkRepository;
 import com.example.esrag.dto.elasticsearch.DocumentChunk;
@@ -27,33 +24,38 @@ public class RagService {
 
     private final ChunkRepository chunkRepository;
     private final EmbeddingService embeddingService;
-    private final ElasticsearchClient esClient;
     private final ZhipuAiClient client;
     private final MemoryService memoryService;
+    private final RetrievalService retrievalService;
     private final String chatModel;
     
     // 长期记忆配置
     private final boolean longTermMemoryEnabled;
     private final int longTermMemoryTopK;
     private final double longTermMemoryRelevanceThreshold;
+    
+    // 检索策略配置
+    private final int retrievalTopK;
 
     public RagService(ChunkRepository chunkRepository,
                       EmbeddingService embeddingService,
-                      ElasticsearchClient esClient,
                       ZhipuAiClient client, MemoryService memoryService,
+                      RetrievalService retrievalService,
                       @Value("${llm.chat-model}") String chatModel,
                       @Value("${memory.long-term.enabled:true}") boolean longTermMemoryEnabled,
                       @Value("${memory.long-term.top-k:3}") int longTermMemoryTopK,
-                      @Value("${memory.long-term.relevance-threshold:0.7}") double longTermMemoryRelevanceThreshold) {
+                      @Value("${memory.long-term.relevance-threshold:0.7}") double longTermMemoryRelevanceThreshold,
+                      @Value("${rag.retrieval.top-k:5}") int retrievalTopK) {
         this.chunkRepository = chunkRepository;
         this.embeddingService = embeddingService;
-        this.esClient = esClient;
         this.client = client;
         this.memoryService = memoryService;
+        this.retrievalService = retrievalService;
         this.chatModel = chatModel;
         this.longTermMemoryEnabled = longTermMemoryEnabled;
         this.longTermMemoryTopK = longTermMemoryTopK;
         this.longTermMemoryRelevanceThreshold = longTermMemoryRelevanceThreshold;
+        this.retrievalTopK = retrievalTopK;
     }
 
     // ========================
@@ -119,11 +121,10 @@ public class RagService {
     public String ask(String question, Long userId, String sessionId) {
         long startTime = System.currentTimeMillis();
 
-        float[] qv = embeddingService.embed(question);
 
-        // 1. 检索语义记忆（知识库文档）
+        // 1. 检索语义记忆（知识库文档）- 使用混合检索
         long knowledgeSearchStart = System.currentTimeMillis();
-        List<DocumentChunk> knowledgeHits = knnSearch(qv, 20);
+        List<DocumentChunk> knowledgeHits = retrievalService.search(question, retrievalTopK);
         long knowledgeSearchTime = System.currentTimeMillis() - knowledgeSearchStart;
         
         if (knowledgeHits.isEmpty()) {
@@ -137,8 +138,8 @@ public class RagService {
             uniqueHits.putIfAbsent(hit.getFileName(), hit);
         }
         List<DocumentChunk> finalKnowledgeHits = new ArrayList<>(uniqueHits.values());
-        if (finalKnowledgeHits.size() > 5) {
-            finalKnowledgeHits = finalKnowledgeHits.subList(0, 5);
+        if (finalKnowledgeHits.size() > retrievalTopK) {
+            finalKnowledgeHits = finalKnowledgeHits.subList(0, retrievalTopK);
         }
 
         log.info("【语义记忆】问题: [{}] 原始命中 {} 条，去重后保留 {} 条 | 耗时: {}ms", 
@@ -234,51 +235,6 @@ public class RagService {
         return prompt.toString();
     }
 
-    /**
-     * ES的kNN向量检索核心代码（就这几行）
-     */
-    /**
-     * ES kNN向量检索（通用兼容写法）
-     */
-    private List<DocumentChunk> knnSearch(float[] queryVector, int topK) {
-        try {
-            List<Float> vectorList = new ArrayList<>();
-            for (float v : queryVector) {
-                vectorList.add(v);
-            }
-            SearchResponse<DocumentChunk> resp = esClient.search(s -> s
-                            .index("doc_chunks")
-                            .knn(k -> k
-                                    .field("vector")
-                                    .queryVector(vectorList)
-                                    .k((long) topK)
-                                    .numCandidates(100L))
-//                              只返回需要的字段，不返回向量
-                            .source(src -> src.filter(f -> f.excludes("vector"))),
-                    DocumentChunk.class);
-
-            // 解析结果
-            List<DocumentChunk> results = new ArrayList<>();
-            for (Hit<DocumentChunk> hit : resp.hits().hits()) {
-                if (hit.source() != null) {
-                    results.add(hit.source());
-                }
-            }
-
-            // RAG 必备日志（能看到到底命中了哪段）
-            log.info("向量检索命中 {} 条 | topK:{}", results.size(), topK);
-            for (DocumentChunk chunk : results) {
-                log.info("命中片段 [{}] >>> {}", chunk.getFileName(), chunk.getContent());
-            }
-
-            return results;
-        } catch (IOException e) {
-            log.error("ES 向量检索异常", e);
-            throw new RuntimeException("ES向量检索失败: " + e.getMessage(), e);
-        }
-    }
-
-
     private String callLlm(String prompt) {
 
 
@@ -327,11 +283,10 @@ public class RagService {
             log.debug("【短期记忆】UserId: {} | SessionId: {} | 历史对话长度: {}", 
                     userId, sessionId, shortTermMemory != null ? shortTermMemory.length() : 0);
 
-            float[] qv = embeddingService.embed(question);
 
-            // 1. 检索语义记忆（知识库文档）
+            // 1. 检索语义记忆（知识库文档）- 使用混合检索
             long knowledgeSearchStart = System.currentTimeMillis();
-            List<DocumentChunk> hits = knnSearch(qv, 5);
+            List<DocumentChunk> hits = retrievalService.search(question, retrievalTopK);
             long knowledgeSearchTime = System.currentTimeMillis() - knowledgeSearchStart;
             
             if (hits.isEmpty()) {

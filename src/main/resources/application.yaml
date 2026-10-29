@@ -44,3 +44,27 @@ memory:
     enabled: ${LONG_TERM_MEMORY_ENABLED:true}
     top-k: ${LONG_TERM_MEMORY_TOP_K:3}
     relevance-threshold: ${LONG_TERM_MEMORY_RELEVANCE_THRESHOLD:0.7}
+
+rag:
+  retrieval:
+    mode: hybrid  # vector | keyword | hybrid
+    top-k: 5
+    num-candidates: 100
+    rrf:
+      rank-constant: 60
+      window-size: 50
+    weights:
+      vector: 0.7
+      keyword: 0.3
+
+# Agent 工具调用配置
+agent:
+  max-rounds: 4  # 工具调用循环最大轮数，防止模型无限调用
+
+# 检索评估配置
+eval:
+  top-k: 5
+  modes: vector,keyword,hybrid
+  testset: classpath:eval/retrieval-testset.json
+  demo-document: classpath:eval/demo-knowledge.md
+  cleanup-demo: true  # 评估结束后清理演示 chunk

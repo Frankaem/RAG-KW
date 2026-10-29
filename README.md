@@ -78,7 +78,7 @@ graph TB
         E[DocumentService<br/>文档管理服务]
         F[RagService<br/>RAG 问答服务]
         G[MemoryService<br/>记忆管理服务]
-        H[ConversationService<br/>对话管理服务]
+        H[ConversationLogService<br/>对话管理服务]
         I[EmbeddingService<br/>向量化服务]
     end
 
@@ -370,3 +370,58 @@ graph TD
 *   **流式响应 (SSE)**：降低首字延迟（TTFT），提升用户交互体验。
 
 *   **代码位置**: `RagService.java` - `askStream()`
+
+---
+
+## 🚀 进阶能力：检索评估 & Agent 工具调用
+
+在基础 RAG 之上，系统内置了两大进阶能力，详细设计、数据流与面试讲解见 [docs/AGENT-EVAL.md](docs/AGENT-EVAL.md)。
+
+### ✅ 检索评估（用数据证明检索质量）
+
+- 内置 12 条带标准答案的测试集（`src/main/resources/eval/retrieval-testset.json`）+ 约 1.1 万字演示知识库
+- 自动对比 **纯向量 / 纯关键词 BM25 / 混合 RRF** 三种模式，计算 **Recall@k、HitRate@k、MRR**
+- 演示 chunk 使用 `eval_demo_` 前缀，评估结束自动清理，不污染正式索引
+- 测试集用"关键词解析"而非写死 chunk 编号，换分块策略后依然有效
+
+```bash
+curl -X POST http://localhost:8080/api/eval/run
+```
+
+返回 `markdownTable` 可直接贴进文档：
+
+| 检索模式 | 用例数 | Recall@5 | HitRate@5 | MRR | 平均耗时 |
+|---|---|---|---|---|---|
+| 纯向量 | 12 | - | - | - | - |
+| 纯关键词 | 12 | - | - | - | - |
+| 混合 RRF | 12 | - | - | - | - |
+
+### 🤖 Agent 工具调用（从被动 RAG 到主动规划）
+
+- 检索被抽象为 `RetrievalService`，普通 RAG、Agent 工具、评估器三处复用同一套代码
+- 内置三个工具：`knowledge_base_search`（混合检索）、`list_documents`（文档列表）、`calculator`（自研表达式解析器）
+- Function Calling 循环：模型决策 → 执行工具 → FUNCTION 角色回填 → 再决策 → 流式生成最终答案
+- 最大轮数兜底防死循环；SSE 事件细分 `tool_call` / `tool_result` / `message`
+
+```bash
+# 非流式：返回答案 + 工具调用轨迹
+curl -X POST http://localhost:8080/api/agent/ask -H "Content-Type: application/json" \
+  -d '{"question":"混合检索怎么融合向量和关键词？","userId":1,"sessionId":"demo"}'
+
+# 流式：演示模型"先查资料再回答"
+curl "http://localhost:8080/api/agent/ask-stream?question=对比第5节和第11节的内容&sessionId=demo"
+```
+
+### 新增配置
+
+```yaml
+agent:
+  max-rounds: 4  # 工具调用循环最大轮数
+
+eval:
+  top-k: 5
+  modes: vector,keyword,hybrid
+  testset: classpath:eval/retrieval-testset.json
+  demo-document: classpath:eval/demo-knowledge.md
+  cleanup-demo: true
+```

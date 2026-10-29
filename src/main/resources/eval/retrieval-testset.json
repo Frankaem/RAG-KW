@@ -1,0 +1,74 @@
+[
+  {
+    "id": "case-01",
+    "question": "RAG-KW 支持上传哪些文档格式？",
+    "expectedKeywords": ["PDF", "Word", "Excel"],
+    "note": "格式支持"
+  },
+  {
+    "id": "case-02",
+    "question": "文档入库时如何避免重复解析？",
+    "expectedKeywords": ["MD5", "秒传"],
+    "note": "去重机制"
+  },
+  {
+    "id": "case-03",
+    "question": "系统的三层记忆分别存储在哪里？",
+    "expectedKeywords": ["短期记忆", "长期记忆", "语义记忆"],
+    "note": "三层记忆"
+  },
+  {
+    "id": "case-04",
+    "question": "混合检索是如何融合向量和关键词两种结果的？",
+    "expectedKeywords": ["RRF", "BM25"],
+    "note": "RRF融合"
+  },
+  {
+    "id": "case-05",
+    "question": "纯向量检索和纯关键词检索各自解决什么问题？",
+    "expectedKeywords": ["纯向量", "纯关键词"],
+    "note": "检索模式"
+  },
+  {
+    "id": "case-06",
+    "question": "问答接口为什么采用流式输出？",
+    "expectedKeywords": ["SSE", "首字"],
+    "note": "流式响应"
+  },
+  {
+    "id": "case-07",
+    "question": "如何一键启动整套运行环境？",
+    "expectedKeywords": ["Docker Compose", "MySQL"],
+    "note": "部署方式"
+  },
+  {
+    "id": "case-08",
+    "question": "系统的 LLM 配置在哪个文件中管理？",
+    "expectedKeywords": [".env", "API Key"],
+    "note": "环境配置"
+  },
+  {
+    "id": "case-09",
+    "question": "文本分块算法如何保证语义完整？",
+    "expectedKeywords": ["递归", "重叠"],
+    "note": "分块策略"
+  },
+  {
+    "id": "case-10",
+    "question": "上传文档的接口说明可以在哪里找到？",
+    "expectedKeywords": ["REST", "API.md"],
+    "note": "接口文档"
+  },
+  {
+    "id": "case-11",
+    "question": "ES 不支持事务，系统如何保证双写一致性？",
+    "expectedKeywords": ["回滚", "补偿"],
+    "note": "事务一致性"
+  },
+  {
+    "id": "case-12",
+    "question": "这套系统适合用在哪些业务场景？",
+    "expectedKeywords": ["企业知识库", "智能客服"],
+    "note": "应用场景"
+  }
+]
